@@ -1,0 +1,72 @@
+version: '3'
+
+#first we define the network for this project
+networks: 
+  finalProjectNetwork: 
+    driver: bridge
+
+#Then we continue with the services
+services :
+  
+  #The mongo db container 
+  mongodb:
+    #Using an official MongoDB image (the latest by default)
+    image: mongo
+    #We connect it to the project network
+    networks: 
+      - finalProjectNetwork
+    #We name it
+    container_name: mongodb-container
+    #And we mount a volume to store the database to make it persistant
+    volumes:
+      - mongodb-volume:/data/db
+      #We also mount a directory to run a script to seed the database
+      - ./mongo/mongo-entrypoint:/docker-entrypoint-initdb.d
+      #The data we want to initialize our database with
+      - ./mongo/locations.json:/locations.json
+      - ./mongo/users.json:/users.json
+    #finally we run the container and the script to fill it with data
+    command: mongod; /bin/bash /docker-entrypoint-initdb.d/seed.sh
+
+  #The Backend container
+  backend: 
+    #Built from the Dockerfile in the Backend directory
+    build: ./web-dev-tp-Backend
+    #We map our port 3000 to the port 3000 of the computer. This is the port to acces our backend
+    ports:
+      - 3000:3000
+    #We connect it to the project network
+    networks:
+      - finalProjectNetwork
+    #We specifiey that our backend depends on the database
+    depends_on:
+      - mongodb
+    #We name it
+    container_name: backend-container
+    #And then we # set the MONGO_URI environment variable to the MongoDB container's URI 
+    #so the backend can acces the database
+    environment:
+      #Uri to our database container
+      - MONGO_URI=mongodb://mongodb:27017/
+      - JWT_SECRET=mysecret
+
+  #the Frontend container
+  frontend:
+    #built from the Dockerfile in the Frontend directory
+    build: ./web-dev-Frontend-Vue-js
+    #We map our port to the port 4173 of the container 
+    ports:
+      - 4173:4173
+    #We connect it to the project network
+    networks:
+      - finalProjectNetwork
+    #We specify that the frontend depends on the backend
+    depends_on:
+      - backend
+    # And we name it
+    container_name: frontend-container
+
+#We define the mongodb volume
+volumes:
+  mongodb-volume:
+
